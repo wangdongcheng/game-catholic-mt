@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Still We Sail — Acts 27</title>
+  <meta name="description" content="A small pixel-art browser game inspired by St. Paul's voyage in Acts 27." />
+  <style>
+    :root{
+      --ink:#243447;
+      --mid:#5c7084;
+      --sea:#2f4a5e;
+      --foam:#eef2ef;
+      --sky:#d9e0df;
+      --sand:#c8b79c;
+      --accent:#7b4d43;
+      --panel:rgba(238,242,239,.88);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      background:
+        radial-gradient(circle at 50% 20%, #edf1ef 0 20%, #cfd8d8 55%, #b9c7ca 100%);
+      color:var(--ink);
+      font-family:"Courier New", Courier, monospace;
+    }
+
+    .wrap{
+      width:min(1180px,100vw);
+      padding:18px;
+    }
+
+    .game-shell{
+      position:relative;
+      width:100%;
+      aspect-ratio:16/9;
+      overflow:hidden;
+      border:4px solid var(--ink);
+      box-shadow:0 18px 50px rgba(24,40,55,.2);
+      background:var(--sky);
+      image-rendering:pixelated;
+      user-select:none;
+      touch-action:manipulation;
+    }
+
+    canvas{
+      width:100%;
+      height:100%;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+
+    .hud{
+      position:absolute;
+      inset:18px 22px auto 22px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      pointer-events:none;
+      font-weight:700;
+      letter-spacing:.06em;
+      text-shadow:2px 2px 0 rgba(238,242,239,.7);
+    }
+
+    .score{
+      font-size:clamp(14px,2vw,28px);
+      line-height:1.18;
+    }
+
+    .title{
+      text-align:right;
+      font-size:clamp(12px,1.65vw,23px);
+      line-height:1.25;
+    }
+
+    .title small{
+      display:block;
+      opacity:.75;
+      font-size:.78em;
+    }
+
+    .overlay{
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      background:linear-gradient(rgba(217,224,223,.15),rgba(36,52,71,.08));
+      transition:.2s;
+    }
+
+    .overlay.hidden{
+      opacity:0;
+      pointer-events:none;
+    }
+
+    .card{
+      max-width:620px;
+      margin:20px;
+      padding:24px 28px;
+      text-align:center;
+      background:var(--panel);
+      border:3px solid var(--ink);
+      box-shadow:8px 8px 0 rgba(36,52,71,.18);
+      backdrop-filter:blur(3px);
+    }
+
+    h1{
+      margin:0 0 8px;
+      font-size:clamp(26px,5vw,58px);
+      letter-spacing:.04em;
+    }
+
+    .subtitle{
+      margin:0 0 18px;
+      font-size:clamp(13px,2vw,20px);
+      line-height:1.5;
+    }
+
+    .keys{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin-top:16px;
+    }
+
+    kbd{
+      padding:7px 10px;
+      border:2px solid var(--ink);
+      background:#fff;
+      box-shadow:3px 3px 0 rgba(36,52,71,.2);
+      font:inherit;
+      font-weight:700;
+    }
+
+    .note{
+      position:absolute;
+      left:18px;
+      bottom:14px;
+      font-size:clamp(10px,1.3vw,14px);
+      opacity:.75;
+      pointer-events:none;
+    }
+
+    .mute{
+      position:absolute;
+      right:14px;
+      bottom:12px;
+      border:2px solid var(--ink);
+      background:rgba(238,242,239,.82);
+      color:var(--ink);
+      font:inherit;
+      font-weight:700;
+      padding:7px 10px;
+      cursor:pointer;
+    }
+
+    @media (max-width:700px){
+      .wrap{padding:0}
+      .game-shell{border-width:0;height:100svh;aspect-ratio:auto}
+      .hud{inset:12px 14px auto 14px}
+      .note{display:none}
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="game-shell" id="gameShell" aria-label="Still We Sail game">
+      <canvas id="game" width="960" height="540"></canvas>
+
+      <div class="hud">
+        <div class="score">
+          SCORE <span id="score">000000</span><br>
+          BEST&nbsp;&nbsp;<span id="best">000000</span>
+        </div>
+        <div class="title">
+          STILL WE SAIL
+          <small>— ACTS 27 —</small>
+        </div>
+      </div>
+
+      <div class="overlay" id="overlay">
+        <div class="card">
+          <h1 id="overlayTitle">STILL WE SAIL</h1>
+          <p class="subtitle" id="overlayText">
+            Guide St. Paul's little ship through storms, sea creatures and the dangerous waters of Melita.
+          </p>
+          <div class="keys">
+            <kbd>SPACE</kbd>
+            <kbd>↑</kbd>
+            <kbd>CLICK / TAP</kbd>
+          </div>
+          <p class="subtitle" style="margin:18px 0 0">Jump to begin</p>
+        </div>
+      </div>
+
+      <div class="note">Melita ahead →</div>
+      <button class="mute" id="muteBtn" type="button">SOUND: ON</button>
+    </section>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const shell = document.getElementById("gameShell");
+  const overlay = document.getElementById("overlay");
+  const overlayTitle = document.getElementById("overlayTitle");
+  const overlayText = document.getElementById("overlayText");
+  const scoreEl = document.getElementById("score");
+  const bestEl = document.getElementById("best");
+  const muteBtn = document.getElementById("muteBtn");
+
+  const W = canvas.width;
+  const H = canvas.height;
+  const SEA_Y = 394;
+
+  const colors = {
+    ink: "#243447",
+    mid: "#5c7084",
+    sea: "#2f4a5e",
+    foam: "#eef2ef",
+    sky: "#d9e0df",
+    pale: "#f5f4ea",
+    sand: "#c8b79c",
+    wood: "#6f5848",
+    wood2: "#4f4036",
+    cloak: "#7b4d43"
+  };
+
+  let audioCtx = null;
+  let muted = false;
+
+  function beep(freq, duration, volume = 0.04, type = "square") {
+    if (muted) return;
+    try {
+      audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.value = volume;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      osc.stop(audioCtx.currentTime + duration);
+    } catch {}
+  }
+
+  muteBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    muted = !muted;
+    muteBtn.textContent = `SOUND: ${muted ? "OFF" : "ON"}`;
+  });
+
+  const state = {
+    mode: "ready",
+    score: 0,
+    best: Number(localStorage.getItem("still-we-sail-best") || 0),
+    speed: 5.1,
+    spawnTimer: 110,
+    worldX: 0,
+    shake: 0,
+    flash: 0,
+    lastTime: 0
+  };
+
+  bestEl.textContent = pad(state.best);
+
+  const player = {
+    x: 190,
+    y: SEA_Y - 65,
+    baseY: SEA_Y - 65,
+    vy: 0,
+    w: 112,
+    h: 74,
+    grounded: true,
+    jumpPower: 12.9,
+    gravity: 0.60,
+    bob: 0
+  };
+
+  let obstacles = [];
+  let particles = [];
+
+  function pad(n) {
+    return String(Math.floor(n)).padStart(6, "0");
+  }
+
+  function rand(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  function reset() {
+    state.score = 0;
+    state.speed = 5.1;
+    state.spawnTimer = 110;
+    state.worldX = 0;
+    state.shake = 0;
+    state.flash = 0;
+    player.y = player.baseY;
+    player.vy = 0;
+    player.grounded = true;
+    obstacles = [];
+    particles = [];
+    scoreEl.textContent = "000000";
+  }
+
+  function startOrJump() {
+    if (state.mode === "ready") {
+      reset();
+      state.mode = "playing";
+      overlay.classList.add("hidden");
+      jump();
+      return;
+    }
+
+    if (state.mode === "gameover") {
+      reset();
+      state.mode = "playing";
+      overlay.classList.add("hidden");
+      jump();
+      return;
+    }
+
+    if (state.mode === "playing") {
+      jump();
+    }
+  }
+
+  function jump() {
+    if (!player.grounded) return;
+    player.vy = -player.jumpPower;
+    player.grounded = false;
+    beep(430, 0.08, 0.035);
+    for (let i = 0; i < 8; i++) {
+      particles.push({
+        x: player.x + 24,
+        y: SEA_Y - 8,
+        vx: rand(-2.4, -0.3),
+        vy: rand(-2.8, -0.4),
+        life: rand(18, 32),
+        size: rand(2, 5)
+      });
+    }
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (["Space", "ArrowUp", "KeyW"].includes(e.code)) {
+      e.preventDefault();
+      startOrJump();
+    }
+  });
+
+  shell.addEventListener("pointerdown", (e) => {
+    if (e.target === muteBtn) return;
+    startOrJump();
+  });
+
+  function spawnObstacle() {
+    const types = ["tentacle", "wave", "fish", "urchin", "serpent"];
+    const weights = [0.25, 0.22, 0.17, 0.20, 0.16];
+    const r = Math.random();
+    let acc = 0;
+    let type = types[0];
+    for (let i = 0; i < types.length; i++) {
+      acc += weights[i];
+      if (r <= acc) {
+        type = types[i];
+        break;
+      }
+    }
+
+    let o = { type, x: W + 90, passed: false, phase: rand(0, Math.PI * 2) };
+
+    if (type === "tentacle") Object.assign(o, { y: SEA_Y - 78, w: 46, h: 92 });
+    if (type === "wave") Object.assign(o, { y: SEA_Y - 65, w: 70, h: 70 });
+    if (type === "fish") Object.assign(o, { y: SEA_Y - rand(48, 100), w: 52, h: 34 });
+    if (type === "urchin") Object.assign(o, { y: SEA_Y - 28, w: 44, h: 34 });
+    if (type === "serpent") Object.assign(o, { y: SEA_Y - 56, w: 58, h: 66 });
+
+    obstacles.push(o);
+  }
+
+  function collide(a, o) {
+    const hit = {
+      x: a.x + 18,
+      y: a.y + 13,
+      w: a.w - 34,
+      h: a.h - 21
+    };
+
+    const padX = o.type === "wave" ? 10 : 6;
+    const padY = o.type === "fish" ? 6 : 4;
+
+    return (
+      hit.x < o.x + o.w - padX &&
+      hit.x + hit.w > o.x + padX &&
+      hit.y < o.y + o.h - padY &&
+      hit.y + hit.h > o.y + padY
+    );
+  }
+
+  function gameOver() {
+    state.mode = "gameover";
+    state.shake = 16;
+    state.flash = 9;
+    beep(120, 0.24, 0.06, "sawtooth");
+
+    if (state.score > state.best) {
+      state.best = Math.floor(state.score);
+      localStorage.setItem("still-we-sail-best", String(state.best));
+      bestEl.textContent = pad(state.best);
+    }
+
+    overlayTitle.textContent = "SHIPWRECK!";
+    overlayText.innerHTML =
+      `Score: <strong>${pad(state.score)}</strong><br><br>` +
+      `“And so it came to pass, that they escaped all safe to land.” — Acts 27:44`;
+    overlay.classList.remove("hidden");
+  }
+
+  function update(dt) {
+    const factor = dt / 16.6667;
+    state.worldX += state.speed * factor;
+
+    if (state.mode !== "playing") {
+      player.bob += 0.035 * factor;
+      return;
+    }
+
+    state.score += 0.12 * state.speed * factor;
+    scoreEl.textContent = pad(state.score);
+    state.speed = Math.min(11.8, 5.1 + state.score / 420);
+
+    player.vy += player.gravity * factor;
+    player.y += player.vy * factor;
+
+    if (player.y >= player.baseY) {
+      player.y = player.baseY;
+      player.vy = 0;
+      player.grounded = true;
+    }
+
+    state.spawnTimer -= factor;
+    if (state.spawnTimer <= 0) {
+      spawnObstacle();
+      const difficultyGap = Math.max(58, 106 - state.speed * 3.4);
+      state.spawnTimer = rand(difficultyGap, difficultyGap + 46);
+    }
+
+    for (const o of obstacles) {
+      o.x -= state.speed * factor;
+      o.phase += 0.05 * factor;
+
+      if (o.type === "fish") {
+        o.y += Math.sin(o.phase) * 0.5;
+      }
+
+      if (!o.passed && o.x + o.w < player.x) {
+        o.passed = true;
+        state.score += 15;
+        beep(760, 0.035, 0.018, "square");
+      }
+
+      if (collide(player, o)) {
+        gameOver();
+        break;
+      }
+    }
+
+    obstacles = obstacles.filter(o => o.x + o.w > -80);
+
+    for (const p of particles) {
+      p.x += p.vx * factor;
+      p.y += p.vy * factor;
+      p.vy += 0.14 * factor;
+      p.life -= factor;
+    }
+    particles = particles.filter(p => p.life > 0);
+
+    if (state.shake > 0) state.shake -= factor;
+    if (state.flash > 0) state.flash -= factor;
+  }
+
+  function pxRect(x, y, w, h, fill) {
+    ctx.fillStyle = fill;
+    ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+  }
+
+  function drawSky() {
+    pxRect(0, 0, W, H, colors.sky);
+
+    ctx.fillStyle = colors.pale;
+    ctx.globalAlpha = 0.62;
+    ctx.beginPath();
+    ctx.arc(664, 232, 38, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    const cloudShift = -(state.worldX * 0.04) % 1060;
+    for (let base = cloudShift - 260; base < W + 260; base += 360) {
+      drawCloud(base, 115, 0.9);
+      drawCloud(base + 170, 210, 0.6);
+    }
+
+    drawIsland(640, 294);
+
+    for (let i = 0; i < 3; i++) {
+      const bx = 790 + i * 38 - ((state.worldX * 0.015) % 110);
+      const by = 160 + (i % 2) * 17;
+      ctx.strokeStyle = colors.ink;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + 7, by - 5);
+      ctx.lineTo(bx + 14, by);
+      ctx.stroke();
+    }
+  }
+
+  function drawCloud(x, y, s) {
+    ctx.fillStyle = colors.pale;
+    const b = 12 * s;
+    pxRect(x, y, 50*s, 14*s, colors.pale);
+    pxRect(x + 10*s, y - 9*s, 22*s, 14*s, colors.pale);
+    pxRect(x + 25*s, y - 15*s, 24*s, 20*s, colors.pale);
+    pxRect(x + 44*s, y - 8*s, 26*s, 15*s, colors.pale);
+  }
+
+  function drawIsland(x, y) {
+    ctx.fillStyle = "#8c9b9f";
+    ctx.beginPath();
+    ctx.moveTo(x - 30, SEA_Y);
+    ctx.lineTo(x + 30, y + 60);
+    ctx.lineTo(x + 95, y + 46);
+    ctx.lineTo(x + 160, y + 66);
+    ctx.lineTo(x + 250, SEA_Y);
+    ctx.closePath();
+    ctx.fill();
+
+    pxRect(x + 72, y + 18, 124, 44, "#7f8f93");
+    pxRect(x + 94, y - 6, 26, 30, "#7f8f93");
+    pxRect(x + 103, y - 28, 10, 24, "#7f8f93");
+    pxRect(x + 107, y - 40, 3, 12, colors.ink);
+    pxRect(x + 102, y - 35, 13, 3, colors.ink);
+
+    ctx.fillStyle = "#6b7d83";
+    for (let i = 0; i < 8; i++) {
+      pxRect(x + 82 + i * 15, y + 34 + (i % 2) * 8, 5, 8, "#65787f");
+    }
+  }
+
+  function drawSea() {
+    pxRect(0, SEA_Y, W, H - SEA_Y, colors.sea);
+
+    for (let row = 0; row < 5; row++) {
+      const y = SEA_Y + 10 + row * 28;
+      const speed = (row + 1) * 0.18;
+      const shift = -((state.worldX * speed) % 80);
+      for (let x = shift - 80; x < W + 80; x += 80) {
+        ctx.strokeStyle = row % 2 ? "#456174" : "#698090";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + 20, y - 7, x + 40, y);
+        ctx.quadraticCurveTo(x + 60, y + 7, x + 80, y);
+        ctx.stroke();
+      }
+    }
+
+    ctx.strokeStyle = colors.foam;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let x = -10; x <= W + 10; x += 16) {
+      const y = SEA_Y + Math.sin((x + state.worldX * 0.7) * 0.03) * 5;
+      if (x === -10) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  function drawBoat() {
+    const x = player.x;
+    const y = player.y + Math.sin(state.worldX * 0.05) * (player.grounded ? 1.5 : 0);
+
+    ctx.save();
+    ctx.translate(Math.round(x), Math.round(y));
+
+    ctx.fillStyle = colors.wood2;
+    ctx.beginPath();
+    ctx.moveTo(4, 43);
+    ctx.lineTo(100, 43);
+    ctx.lineTo(87, 66);
+    ctx.lineTo(23, 69);
+    ctx.closePath();
+    ctx.fill();
+
+    pxRect(15, 48, 78, 7, colors.wood);
+    pxRect(23, 57, 64, 5, "#8a6e58");
+
+    pxRect(62, 4, 4, 42, colors.ink);
+    pxRect(64, 8, 4, 6, colors.ink);
+
+    ctx.fillStyle = colors.pale;
+    ctx.beginPath();
+    ctx.moveTo(67, 9);
+    ctx.lineTo(91, 18);
+    ctx.lineTo(92, 39);
+    ctx.lineTo(68, 37);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = colors.ink;
+    ctx.fillRect(37, 18, 18, 18);
+    ctx.fillRect(32, 33, 26, 7);
+
+    pxRect(40, 21, 12, 11, "#d3b99b");
+    pxRect(34, 36, 21, 17, colors.pale);
+    pxRect(29, 39, 8, 15, colors.cloak);
+    pxRect(49, 34, 10, 18, colors.cloak);
+    pxRect(45, 31, 10, 6, colors.ink);
+    pxRect(31, 50, 29, 5, colors.ink);
+
+    ctx.restore();
+  }
+
+  function drawTentacle(o) {
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = 18;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(23, 88);
+    ctx.bezierCurveTo(4, 55, 47, 54, 26, 10);
+    ctx.stroke();
+
+    ctx.fillStyle = colors.pale;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc(31 + Math.sin(i)*4, 67 - i*15, 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawWave(o) {
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.fillStyle = colors.mid;
+    ctx.beginPath();
+    ctx.moveTo(0, 66);
+    ctx.quadraticCurveTo(26, 8, 54, 20);
+    ctx.quadraticCurveTo(35, 25, 31, 45);
+    ctx.quadraticCurveTo(45, 31, 67, 38);
+    ctx.lineTo(70, 66);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = colors.foam;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(10, 47);
+    ctx.quadraticCurveTo(28, 8, 55, 22);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawFish(o) {
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.fillStyle = colors.ink;
+    ctx.beginPath();
+    ctx.ellipse(25, 17, 18, 11, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(7, 17);
+    ctx.lineTo(0, 6);
+    ctx.lineTo(1, 25);
+    ctx.closePath();
+    ctx.fill();
+    pxRect(34, 10, 4, 4, colors.foam);
+    ctx.restore();
+  }
+
+  function drawUrchin(o) {
+    ctx.save();
+    ctx.translate(o.x + 22, o.y + 17);
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 10; i++) {
+      const a = (Math.PI * 2 * i) / 10;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 10, Math.sin(a) * 10);
+      ctx.lineTo(Math.cos(a) * 21, Math.sin(a) * 17);
+      ctx.stroke();
+    }
+    ctx.fillStyle = colors.ink;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSerpent(o) {
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = 14;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(12, 61);
+    ctx.bezierCurveTo(48, 49, 4, 27, 40, 8);
+    ctx.stroke();
+    ctx.fillStyle = colors.ink;
+    ctx.beginPath();
+    ctx.arc(42, 8, 10, 0, Math.PI * 2);
+    ctx.fill();
+    pxRect(45, 4, 3, 3, colors.foam);
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life / 30);
+      pxRect(p.x, p.y, p.size, p.size, colors.foam);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawReadyHint() {
+    if (state.mode === "playing") return;
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = colors.ink;
+    ctx.font = "bold 20px Courier New";
+    ctx.fillText("MALTA • MELITA", 710, 372);
+    ctx.globalAlpha = 1;
+  }
+
+  function render() {
+    ctx.save();
+
+    if (state.shake > 0) {
+      ctx.translate(rand(-state.shake, state.shake), rand(-state.shake, state.shake));
+    }
+
+    drawSky();
+    drawSea();
+
+    for (const o of obstacles) {
+      if (o.type === "tentacle") drawTentacle(o);
+      if (o.type === "wave") drawWave(o);
+      if (o.type === "fish") drawFish(o);
+      if (o.type === "urchin") drawUrchin(o);
+      if (o.type === "serpent") drawSerpent(o);
+    }
+
+    drawParticles();
+    drawBoat();
+    drawReadyHint();
+
+    ctx.restore();
+
+    if (state.flash > 0) {
+      ctx.fillStyle = `rgba(245,244,234,${Math.min(.55, state.flash / 12)})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function loop(t) {
+    const dt = Math.min(34, t - (state.lastTime || t));
+    state.lastTime = t;
+    update(dt || 16.6667);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

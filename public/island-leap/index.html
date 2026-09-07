@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta property="og:url" content="https://game.catholic.mt/island-leap/">
+<meta property="og:image" content="https://game.catholic.mt/island-leap/og-image.png">
+<meta name="google-adsense-account" content="ca-pub-8822751120164826">
+<title>Paul's Island Leap 3D</title>
+<meta name="description" content="A pseudo-3D isometric island jumping game featuring St. Paul.">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{
+  background:linear-gradient(#dff4f5,#9dced8);
+  font-family:ui-monospace,Consolas,monospace;
+  color:#213547;
+  user-select:none;
+}
+#app{position:relative;width:100%;height:100%}
+canvas{width:100%;height:100%;display:block}
+.hud{
+  position:absolute;left:16px;right:16px;top:14px;
+  display:flex;justify-content:space-between;align-items:flex-start;
+  font-weight:800;pointer-events:none;text-shadow:0 2px #fff8;
+}
+.title{text-align:right}
+.title small{display:block;font-size:.72em;opacity:.7}
+.overlay{
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:#23445522;padding:20px;
+}
+.overlay.hidden{display:none}
+.card{
+  width:min(560px,92vw);padding:24px;text-align:center;
+  background:#fffffff0;border:2px solid #213547;
+  box-shadow:8px 8px 0 #21354722;
+}
+h1{margin:0 0 10px;font-size:clamp(30px,6vw,58px)}
+p{line-height:1.55}
+kbd{
+  display:inline-block;padding:8px 12px;border:2px solid #213547;
+  background:#fff;box-shadow:3px 3px 0 #21354722;font:inherit;font-weight:800;
+}
+.hint{
+  position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+  background:#ffffffe8;border:1px solid #21354788;padding:8px 12px;
+  font-weight:800;white-space:nowrap;pointer-events:none;
+}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="game"></canvas>
+
+<div class="hud">
+  <div>SCORE <span id="score">0</span><br>BEST&nbsp;&nbsp;<span id="best">0</span></div>
+  <div class="title">PAUL'S ISLAND LEAP<small>ISOMETRIC MEDITERRANEAN</small></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="card">
+    <h1 id="ot">PAUL'S ISLAND LEAP</h1>
+    <p id="op">Press Space once to start. Then hold Space to charge and release Space to leap.</p>
+    <p><kbd>SPACE</kbd></p>
+  </div>
+</div>
+
+<div class="hint" id="hint">HOLD SPACE TO CHARGE • RELEASE SPACE TO JUMP</div>
+</div>
+
+<script>
+(()=>{
+"use strict";
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const scoreEl=document.getElementById("score");
+const bestEl=document.getElementById("best");
+const overlay=document.getElementById("overlay");
+const ot=document.getElementById("ot");
+const op=document.getElementById("op");
+const hint=document.getElementById("hint");
+
+let W=innerWidth,H=innerHeight,DPR=Math.min(devicePixelRatio||1,2);
+
+function resize(){
+  W=innerWidth; H=innerHeight; DPR=Math.min(devicePixelRatio||1,2);
+  canvas.width=Math.floor(W*DPR);
+  canvas.height=Math.floor(H*DPR);
+  canvas.style.width=W+"px";
+  canvas.style.height=H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener("resize",resize);
+resize();
+
+const C={
+  sky1:"#e5f5f6", sky2:"#9fcbd5",
+  sea1:"#4b8ca5", sea2:"#2f6075",
+  top:"#7f9d71", top2:"#6f8b63",
+  left:"#756d60", right:"#5f594f",
+  sand:"#d4c08e", ink:"#213547",
+  robe:"#efe8d9", cloak:"#8b5047", skin:"#d9b28c",
+  gold:"#d2aa5c", foam:"#eef8f4"
+};
+
+const names=["Caesarea","Cyprus","Rhodes","Crete","Malta","Gozo","Sicily","Capri","Melita"];
+
+const g={
+  mode:"ready",
+  score:0,
+  best:+localStorage.getItem("paulLeapIsoBest")||0,
+  charging:false,
+  charge:0,
+  dir:1,
+  last:0,
+  camX:0,
+  camY:0
+};
+bestEl.textContent=g.best;
+
+let platforms=[];
+
+const p={
+  x:0,y:0,z:0,
+  vx:0,vy:0,vz:0,
+  ground:true,
+  on:0
+};
+
+function project(wx,wy,wz=0){
+  const sx=(wx-wy)*0.72 - g.camX + W*0.50;
+  const sy=(wx+wy)*0.36 - wz - g.camY + H*0.42;
+  return {x:sx,y:sy};
+}
+
+function makePlatforms(){
+  platforms=[];
+  let wx=-40, wy=-40;
+
+  for(let i=0;i<55;i++){
+    const size=i===0?150:105+Math.random()*85;
+    if(i>0){
+      const step=165+Math.random()*115;
+      if(Math.random()<0.48) wx+=step;
+      else wy+=step;
+    }
+    const height=38+Math.random()*32;
+    platforms.push({
+      x:wx,y:wy,z:0,size,height,
+      name:names[i%names.length]
+    });
+  }
+}
+
+function reset(){
+  makePlatforms();
+  const a=platforms[0];
+  p.x=a.x+a.size/2;
+  p.y=a.y+a.size/2;
+  p.z=0;
+  p.vx=p.vy=p.vz=0;
+  p.ground=true;
+  p.on=0;
+
+  g.score=0;
+  g.charge=0;
+  g.dir=1;
+  g.charging=false;
+  scoreEl.textContent="0";
+
+  const pp=project(p.x,p.y,0);
+  g.camX=pp.x-W*.5;
+  g.camY=pp.y-H*.55;
+}
+reset();
+
+function start(){
+  if(g.mode!=="playing"){
+    reset();
+    g.mode="playing";
+    overlay.classList.add("hidden");
+    hint.textContent="HOLD SPACE TO CHARGE • RELEASE SPACE TO JUMP";
+  }
+}
+
+function keyDown(e){
+  if(e.code!=="Space"||e.repeat)return;
+  e.preventDefault();
+
+  if(g.mode==="ready" || g.mode==="gameover"){
+    start();
+    return;
+  }
+
+  if(!p.ground)return;
+
+  g.charging=true;
+  g.charge=Math.max(.06,g.charge);
+}
+
+function keyUp(e){
+  if(e.code!=="Space")return;
+  e.preventDefault();
+  if(!g.charging||!p.ground)return;
+
+  g.charging=false;
+  p.ground=false;
+
+  const target=platforms[Math.min(p.on+1,platforms.length-1)];
+  const current=platforms[p.on];
+
+  const dx=(target.x+target.size/2)-(current.x+current.size/2);
+  const dy=(target.y+target.size/2)-(current.y+current.size/2);
+  const len=Math.hypot(dx,dy)||1;
+  const nx=dx/len, ny=dy/len;
+
+  const power=.26+g.charge*.74;
+  const horizontal=2.8+power*3.4;
+
+  p.vx=nx*horizontal;
+  p.vy=ny*horizontal;
+  p.vz=9.6+power*6.5;
+
+  g.charge=0;
+  g.dir=1;
+}
+
+addEventListener("keydown",keyDown);
+addEventListener("keyup",keyUp);
+
+function insidePlatform(a,x,y){
+  return x>=a.x && x<=a.x+a.size && y>=a.y && y<=a.y+a.size;
+}
+
+function landCheck(){
+  for(let i=Math.max(0,p.on-1);i<Math.min(platforms.length,p.on+4);i++){
+    const a=platforms[i];
+    if(insidePlatform(a,p.x,p.y)){
+      p.ground=true;
+      p.vx=p.vy=p.vz=0;
+      p.z=0;
+
+      if(i>p.on){
+        p.on=i;
+        g.score++;
+
+        const cx=a.x+a.size/2,cy=a.y+a.size/2;
+        const d=Math.hypot(p.x-cx,p.y-cy);
+        if(d<a.size*.13){
+          g.score+=2;
+          hint.textContent="PERFECT LANDING +3";
+          setTimeout(()=>g.mode==="playing"&&(hint.textContent="HOLD SPACE TO CHARGE • RELEASE SPACE TO JUMP"),650);
+        }
+
+        scoreEl.textContent=g.score;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+function fail(){
+  if(g.mode!=="playing")return;
+  g.mode="gameover";
+
+  if(g.score>g.best){
+    g.best=g.score;
+    bestEl.textContent=g.best;
+    localStorage.setItem("paulLeapIsoBest",g.best);
+  }
+
+  ot.textContent="INTO THE SEA!";
+  op.innerHTML=`Score: <strong>${g.score}</strong><br><br>Press and hold Space to try again.`;
+  overlay.classList.remove("hidden");
+}
+
+function update(dt){
+  const f=dt/16.67;
+
+  if(g.charging&&p.ground){
+    g.charge+=.014*g.dir*f;
+    if(g.charge>=1){g.charge=1;g.dir=-1}
+    if(g.charge<=.06){g.charge=.06;g.dir=1}
+  }
+
+  if(g.mode==="playing"&&!p.ground){
+    p.x+=p.vx*f;
+    p.y+=p.vy*f;
+    p.z+=p.vz*f;
+    p.vz-=.55*f;
+
+    if(p.z<=0 && p.vz<0){
+      p.z=0;
+      if(!landCheck())fail();
+    }
+  }
+
+  const pp=project(p.x,p.y,p.z);
+  const targetCamX=pp.x-W*.52;
+  const targetCamY=pp.y-H*.48;
+  g.camX+=(targetCamX-g.camX)*Math.min(1,.05*f);
+  g.camY+=(targetCamY-g.camY)*Math.min(1,.05*f);
+}
+
+function polygon(points,fill){
+  ctx.fillStyle=fill;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x,points[0].y);
+  for(let i=1;i<points.length;i++)ctx.lineTo(points[i].x,points[i].y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawPlatform(a,index){
+  const zTop=0;
+  const zBottom=-a.height;
+
+  const A=project(a.x,a.y,zTop);
+  const B=project(a.x+a.size,a.y,zTop);
+  const Cc=project(a.x+a.size,a.y+a.size,zTop);
+  const D=project(a.x,a.y+a.size,zTop);
+
+  const Ab=project(a.x,a.y,zBottom);
+  const Bb=project(a.x+a.size,a.y,zBottom);
+  const Cb=project(a.x+a.size,a.y+a.size,zBottom);
+  const Db=project(a.x,a.y+a.size,zBottom);
+
+  polygon([D,Cc,Cb,Db],C.left);
+  polygon([B,Cc,Cb,Bb],C.right);
+  polygon([A,B,Cc,D],index%2?C.top2:C.top);
+
+  const center=project(a.x+a.size/2,a.y+a.size/2,0);
+
+  if(a.size>120){
+    ctx.fillStyle=C.sand;
+    ctx.beginPath();
+    ctx.ellipse(center.x,center.y+3,a.size*.20,a.size*.06,0,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle=C.ink;
+  ctx.font="700 12px ui-monospace";
+  ctx.textAlign="center";
+  ctx.fillText(a.name,center.x,center.y-a.size*.20);
+
+  if(index===p.on+1){
+    ctx.strokeStyle=C.gold;
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.arc(center.x,center.y,10,0,Math.PI*2);
+    ctx.stroke();
+  }
+}
+
+function drawPaul(){
+  const s=project(p.x,p.y,p.z);
+
+  ctx.fillStyle="#21354725";
+  ctx.beginPath();
+  ctx.ellipse(s.x,s.y+9,17,7,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle=C.robe;
+  ctx.beginPath();
+  ctx.moveTo(s.x-10,s.y-28);
+  ctx.lineTo(s.x+9,s.y-28);
+  ctx.lineTo(s.x+14,s.y+7);
+  ctx.lineTo(s.x-14,s.y+7);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle=C.cloak;
+  ctx.beginPath();
+  ctx.moveTo(s.x-9,s.y-26);
+  ctx.lineTo(s.x-17,s.y-6);
+  ctx.lineTo(s.x-7,s.y+6);
+  ctx.lineTo(s.x+1,s.y-20);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle=C.skin;
+  ctx.beginPath();
+  ctx.arc(s.x,s.y-40,9,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle=C.ink;
+  ctx.beginPath();
+  ctx.arc(s.x,s.y-42,10,Math.PI,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(s.x-6,s.y-35);
+  ctx.lineTo(s.x,s.y-27);
+  ctx.lineTo(s.x+7,s.y-35);
+  ctx.lineTo(s.x+4,s.y-25);
+  ctx.lineTo(s.x-4,s.y-25);
+  ctx.closePath();
+  ctx.fill();
+
+  if(g.charging){
+    const w=92;
+    ctx.fillStyle="#fff";
+    ctx.fillRect(s.x-w/2,s.y-66,w,9);
+    ctx.fillStyle=C.gold;
+    ctx.fillRect(s.x-w/2,s.y-66,w*g.charge,9);
+    ctx.strokeStyle=C.ink;
+    ctx.strokeRect(s.x-w/2,s.y-66,w,9);
+  }
+}
+
+function drawSea(){
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,C.sky1);
+  grad.addColorStop(.52,C.sky2);
+  grad.addColorStop(.521,C.sea1);
+  grad.addColorStop(1,C.sea2);
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle="#fff8";
+  for(let i=0;i<6;i++){
+    const cx=(i*300-(g.camX*.08))%(W+400)-80;
+    const cy=80+(i%3)*55;
+    ctx.beginPath();
+    ctx.ellipse(cx,cy,48,15,0,0,Math.PI*2);
+    ctx.ellipse(cx+38,cy-9,35,19,0,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle="#ffffff55";
+  ctx.lineWidth=2.5;
+  for(let r=0;r<6;r++){
+    ctx.beginPath();
+    const yy=H*.58+r*30;
+    for(let xx=-20;xx<W+20;xx+=28){
+      const y=yy+Math.sin((xx+g.camX*.18)*.035)*4;
+      xx===-20?ctx.moveTo(xx,y):ctx.lineTo(xx,y);
+    }
+    ctx.stroke();
+  }
+}
+
+function draw(){
+  drawSea();
+
+  const visible=platforms
+    .map((a,i)=>({a,i,key:a.x+a.y}))
+    .sort((u,v)=>u.key-v.key);
+
+  visible.forEach(({a,i})=>drawPlatform(a,i));
+
+  if(g.mode!=="gameover")drawPaul();
+}
+
+function loop(t){
+  const dt=Math.min(33,t-(g.last||t));
+  g.last=t;
+  update(dt||16.67);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -25,6 +25,7 @@
     body {
       background: linear-gradient(#dff4f5, #9dced8);
       touch-action: none;
+      overscroll-behavior: none;
       font-family: ui-monospace, Consolas, monospace;
       color: #213547;
       user-select: none;
@@ -301,39 +302,36 @@
         g.dir = 1;
       }
 
-
       addEventListener("keydown", keyDown);
       addEventListener("keyup", keyUp);
 
-      let activePointerId = null;
+      let touchCharging = false;
 
-      function pointerDown(e) {
-        if (e.pointerType === "mouse") return;
+      function beginTouchCharge(e) {
         e.preventDefault();
-
-        if (activePointerId !== null) return;
-        activePointerId = e.pointerId;
 
         if (g.mode === "ready" || g.mode === "gameover") {
           start();
+          touchCharging = false;
           return;
         }
 
-        if (!p.ground) return;
+        if (!p.ground || g.charging) return;
 
         g.charging = true;
         g.charge = Math.max(.06, g.charge);
+        touchCharging = true;
       }
 
-      function pointerUp(e) {
-        if (e.pointerType === "mouse") return;
-        if (activePointerId !== null && e.pointerId !== activePointerId) return;
-
+      function releaseTouchJump(e) {
         e.preventDefault();
-        activePointerId = null;
 
-        if (!g.charging || !p.ground || g.mode !== "playing") return;
+        if (!touchCharging || !g.charging || !p.ground || g.mode !== "playing") {
+          touchCharging = false;
+          return;
+        }
 
+        touchCharging = false;
         g.charging = false;
         p.ground = false;
 
@@ -356,15 +354,14 @@
         g.dir = 1;
       }
 
-      canvas.addEventListener("pointerdown", pointerDown, { passive: false });
-      canvas.addEventListener("pointerup", pointerUp, { passive: false });
-      canvas.addEventListener("pointercancel", e => {
-        if (e.pointerType === "mouse") return;
-        activePointerId = null;
+      window.addEventListener("touchstart", beginTouchCharge, { passive: false });
+      window.addEventListener("touchend", releaseTouchJump, { passive: false });
+      window.addEventListener("touchcancel", e => {
+        e.preventDefault();
+        touchCharging = false;
         g.charging = false;
         g.charge = 0;
       }, { passive: false });
-
 
       function insidePlatform(a, x, y) {
         return x >= a.x && x <= a.x + a.size && y >= a.y && y <= a.y + a.size;

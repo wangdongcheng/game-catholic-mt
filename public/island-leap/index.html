@@ -120,6 +120,42 @@
       white-space: nowrap;
       pointer-events: none;
     }
+
+    @media (orientation:portrait) {
+      .hud {
+        top: max(10px, env(safe-area-inset-top));
+        left: max(10px, env(safe-area-inset-left));
+        right: max(10px, env(safe-area-inset-right));
+        font-size: 12px;
+      }
+
+      .title {
+        max-width: 46vw;
+        line-height: 1.15;
+      }
+
+      .title small {
+        font-size: .62em;
+      }
+
+      .card {
+        width: min(88vw, 460px);
+        padding: 20px 16px;
+      }
+
+      h1 {
+        font-size: clamp(28px, 10vw, 44px);
+      }
+
+      .hint {
+        bottom: max(12px, calc(env(safe-area-inset-bottom) + 10px));
+        font-size: 11px;
+        padding: 7px 9px;
+        max-width: 92vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
   </style>
 </head>
 
@@ -170,6 +206,10 @@
       addEventListener("resize", resize);
       resize();
 
+      function isPortrait() {
+        return H > W;
+      }
+
       const C = {
         sky1: "#e5f5f6", sky2: "#9fcbd5",
         sea1: "#4b8ca5", sea2: "#2f6075",
@@ -205,8 +245,14 @@
       };
 
       function project(wx, wy, wz = 0) {
-        const sx = (wx - wy) * 0.72 - g.camX + W * 0.50;
-        const sy = (wx + wy) * 0.36 - wz - g.camY + H * 0.42;
+        const portrait = isPortrait();
+        const isoX = portrait ? 0.46 : 0.72;
+        const isoY = portrait ? 0.23 : 0.36;
+        const zScale = portrait ? 0.78 : 1;
+
+        const sx = (wx - wy) * isoX - g.camX + W * 0.50;
+        const sy = (wx + wy) * isoY - wz * zScale - g.camY + H * (portrait ? 0.46 : 0.42);
+
         return { x: sx, y: sy };
       }
 
@@ -432,10 +478,12 @@
         }
 
         const pp = project(p.x, p.y, p.z);
-        const targetCamX = pp.x - W * .52;
-        const targetCamY = pp.y - H * .48;
-        g.camX += (targetCamX - g.camX) * Math.min(1, .05 * f);
-        g.camY += (targetCamY - g.camY) * Math.min(1, .05 * f);
+        const portrait = isPortrait();
+        const targetCamX = pp.x - W * (portrait ? .50 : .52);
+        const targetCamY = pp.y - H * (portrait ? .54 : .48);
+
+        g.camX += (targetCamX - g.camX) * Math.min(1, .055 * f);
+        g.camY += (targetCamY - g.camY) * Math.min(1, .055 * f);
       }
 
       function polygon(points, fill) {
@@ -475,7 +523,7 @@
         }
 
         ctx.fillStyle = C.ink;
-        ctx.font = "700 12px ui-monospace";
+        ctx.font = `700 ${isPortrait() ? 10 : 12}px ui-monospace`;
         ctx.textAlign = "center";
         ctx.fillText(a.name, center.x, center.y - a.size * .20);
 
@@ -490,6 +538,13 @@
 
       function drawPaul() {
         const s = project(p.x, p.y, p.z);
+
+        ctx.save();
+        if (isPortrait()) {
+          ctx.translate(s.x, s.y);
+          ctx.scale(.82, .82);
+          ctx.translate(-s.x, -s.y);
+        }
 
         ctx.fillStyle = "#21354725";
         ctx.beginPath();
@@ -542,13 +597,17 @@
           ctx.strokeStyle = C.ink;
           ctx.strokeRect(s.x - w / 2, s.y - 66, w, 9);
         }
+
+        ctx.restore();
       }
 
       function drawSea() {
+        const portrait = isPortrait();
+        const horizon = portrait ? .40 : .52;
         const grad = ctx.createLinearGradient(0, 0, 0, H);
         grad.addColorStop(0, C.sky1);
-        grad.addColorStop(.52, C.sky2);
-        grad.addColorStop(.521, C.sea1);
+        grad.addColorStop(horizon, C.sky2);
+        grad.addColorStop(horizon + .001, C.sea1);
         grad.addColorStop(1, C.sea2);
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
@@ -567,7 +626,7 @@
         ctx.lineWidth = 2.5;
         for (let r = 0; r < 6; r++) {
           ctx.beginPath();
-          const yy = H * .58 + r * 30;
+          const yy = H * (isPortrait() ? .47 : .58) + r * (isPortrait() ? 38 : 30);
           for (let xx = -20; xx < W + 20; xx += 28) {
             const y = yy + Math.sin((xx + g.camX * .18) * .035) * 4;
             xx === -20 ? ctx.moveTo(xx, y) : ctx.lineTo(xx, y);

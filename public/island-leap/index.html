@@ -22,7 +22,7 @@ body{
 #app{position:relative;width:100%;height:100%}
 canvas{width:100%;height:100%;display:block;touch-action:none}
 .hud{
-  position:absolute;left:16px;right:16px;top:14px;
+  position:absolute;left:16px;right:16px;top:54px;
   display:flex;justify-content:space-between;align-items:flex-start;
   font-weight:800;pointer-events:none;text-shadow:0 2px #fff8;
 }
@@ -50,9 +50,22 @@ kbd{
   font-weight:800;white-space:nowrap;pointer-events:none;
 }
 
+.back-home{
+  position:absolute;z-index:20;
+  top:max(10px,env(safe-area-inset-top));
+  left:max(10px,env(safe-area-inset-left));
+  display:inline-flex;align-items:center;min-height:32px;
+  padding:6px 10px;border:1px solid #21354788;
+  background:#ffffffe8;box-shadow:3px 3px 0 #21354722;
+  color:#213547;font:800 12px/1 ui-monospace,Consolas,monospace;
+  text-decoration:none;-webkit-tap-highlight-color:transparent;
+}
+.back-home:hover{background:#fff}
+.back-home:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
 @media (orientation:portrait){
   .hud{
-    top:max(10px,env(safe-area-inset-top));
+    top:max(52px,calc(env(safe-area-inset-top) + 42px));
     left:max(10px,env(safe-area-inset-left));
     right:max(10px,env(safe-area-inset-right));
     font-size:12px;
@@ -84,6 +97,7 @@ kbd{
 </head>
 <body>
 <div id="app">
+<a class="back-home" href="/" aria-label="Back to game home">← GAMES</a>
 <canvas id="game"></canvas>
 
 <div class="hud">
@@ -388,6 +402,7 @@ addEventListener("keyup",keyUp);
 let touchCharging = false;
 
 function beginTouchCharge(e){
+  if(e.target.closest(".back-home"))return;
   e.preventDefault();
 
   if(g.mode==="ready" || g.mode==="gameover"){
@@ -404,6 +419,7 @@ function beginTouchCharge(e){
 }
 
 function releaseTouchJump(e){
+  if(e.target.closest(".back-home"))return;
   e.preventDefault();
 
   if(!touchCharging || !g.charging || !p.ground || g.mode!=="playing"){

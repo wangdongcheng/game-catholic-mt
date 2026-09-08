@@ -115,6 +115,105 @@ const ot=document.getElementById("ot");
 const op=document.getElementById("op");
 const hint=document.getElementById("hint");
 
+const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+let audioCtx=null;
+
+function ensureAudio(){
+  if(!AudioContextClass)return null;
+  if(!audioCtx)audioCtx=new AudioContextClass();
+  if(audioCtx.state==="suspended")audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone({
+  frequency=440,
+  endFrequency=null,
+  duration=.15,
+  type="sine",
+  volume=.12,
+  delay=0
+}={}){
+  const ac=ensureAudio();
+  if(!ac)return;
+
+  const start=ac.currentTime+delay;
+  const osc=ac.createOscillator();
+  const gain=ac.createGain();
+
+  osc.type=type;
+  osc.frequency.setValueAtTime(Math.max(1,frequency),start);
+
+  if(endFrequency){
+    osc.frequency.exponentialRampToValueAtTime(
+      Math.max(1,endFrequency),
+      start+duration
+    );
+  }
+
+  gain.gain.setValueAtTime(Math.max(.0001,volume),start);
+  gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+
+  osc.connect(gain);
+  gain.connect(ac.destination);
+
+  osc.start(start);
+  osc.stop(start+duration+.02);
+}
+
+function soundStart(){
+  playTone({frequency:330,endFrequency:520,duration:.16,type:"triangle",volume:.08});
+}
+
+function soundJump(){
+  playTone({frequency:180,endFrequency:430,duration:.18,type:"triangle",volume:.11});
+}
+
+function soundLand(){
+  playTone({frequency:150,endFrequency:95,duration:.12,type:"sine",volume:.14});
+}
+
+function soundPerfect(){
+  playTone({frequency:660,duration:.12,type:"sine",volume:.12});
+  playTone({frequency:880,duration:.16,type:"sine",volume:.11,delay:.09});
+  playTone({frequency:1100,duration:.18,type:"sine",volume:.10,delay:.18});
+}
+
+function soundSplash(){
+  const ac=ensureAudio();
+  if(!ac)return;
+
+  const duration=.42;
+  const buffer=ac.createBuffer(1,Math.floor(ac.sampleRate*duration),ac.sampleRate);
+  const data=buffer.getChannelData(0);
+
+  for(let i=0;i<data.length;i++){
+    const decay=1-i/data.length;
+    data[i]=(Math.random()*2-1)*decay;
+  }
+
+  const source=ac.createBufferSource();
+  const filter=ac.createBiquadFilter();
+  const gain=ac.createGain();
+
+  source.buffer=buffer;
+  filter.type="lowpass";
+  filter.frequency.setValueAtTime(900,ac.currentTime);
+  filter.frequency.exponentialRampToValueAtTime(180,ac.currentTime+duration);
+
+  gain.gain.setValueAtTime(.18,ac.currentTime);
+  gain.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+duration);
+
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(ac.destination);
+  source.start();
+}
+
+function soundGameOver(){
+  playTone({frequency:260,endFrequency:150,duration:.28,type:"triangle",volume:.10});
+  playTone({frequency:180,endFrequency:85,duration:.42,type:"triangle",volume:.10,delay:.20});
+}
+
 let W=innerWidth,H=innerHeight,DPR=Math.min(devicePixelRatio||1,2);
 
 function resize(){
@@ -235,6 +334,7 @@ function start(){
     g.mode="playing";
     overlay.classList.add("hidden");
     hint.textContent="HOLD SPACE / SCREEN TO CHARGE • RELEASE TO JUMP";
+    soundStart();
   }
 }
 
@@ -275,6 +375,8 @@ function keyUp(e){
   p.vx=nx*horizontal;
   p.vy=ny*horizontal;
   p.vz=9.6+power*6.5;
+
+  soundJump();
 
   g.charge=0;
   g.dir=1;
@@ -328,6 +430,8 @@ function releaseTouchJump(e){
   p.vy=ny*horizontal;
   p.vz=9.6+power*6.5;
 
+  soundJump();
+
   g.charge=0;
   g.dir=1;
 }
@@ -352,6 +456,7 @@ function landCheck(){
       p.ground=true;
       p.vx=p.vy=p.vz=0;
       p.z=0;
+      soundLand();
 
       if(i>p.on){
         p.on=i;
@@ -361,6 +466,7 @@ function landCheck(){
         const d=Math.hypot(p.x-cx,p.y-cy);
         if(d<a.size*.13){
           g.score+=2;
+          soundPerfect();
           hint.textContent="PERFECT LANDING +3";
           setTimeout(()=>g.mode==="playing"&&(hint.textContent="HOLD SPACE / SCREEN TO CHARGE • RELEASE TO JUMP"),650);
         }
@@ -376,6 +482,9 @@ function landCheck(){
 function fail(){
   if(g.mode!=="playing")return;
   g.mode="gameover";
+
+  soundSplash();
+  soundGameOver();
 
   if(g.score>g.best){
     g.best=g.score;

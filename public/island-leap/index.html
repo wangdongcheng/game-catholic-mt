@@ -63,6 +63,16 @@ kbd{
 .back-home:hover{background:#fff}
 .back-home:focus-visible{outline:3px solid #fff;outline-offset:3px}
 
+.mute{
+  position:absolute;right:14px;bottom:12px;z-index:20;
+  border:2px solid #213547;background:#ffffffe8;color:#213547;
+  font:800 12px/1 ui-monospace,Consolas,monospace;
+  padding:7px 10px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.mute:hover{background:#fff}
+.mute:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
 @media (orientation:portrait){
   .hud{
     top:max(52px,calc(env(safe-area-inset-top) + 42px));
@@ -93,6 +103,17 @@ kbd{
     text-overflow:ellipsis;
   }
 }
+@media (orientation:portrait){
+  .mute{
+    right:max(7px,env(safe-area-inset-right));
+    bottom:max(50px,calc(env(safe-area-inset-bottom) + 48px));
+    padding:4px 6px;border-width:1px;font-size:9px;
+  }
+}
+
+@media (pointer:coarse){
+  .mute{min-width:72px;min-height:30px}
+}
 </style>
 </head>
 <body>
@@ -114,6 +135,7 @@ kbd{
 </div>
 
 <div class="hint" id="hint">HOLD SPACE / SCREEN TO CHARGE • RELEASE TO JUMP</div>
+<button class="mute" id="muteBtn" type="button" aria-label="Toggle sound effects" aria-pressed="false">SOUND: ON</button>
 </div>
 
 <script>
@@ -128,16 +150,25 @@ const overlay=document.getElementById("overlay");
 const ot=document.getElementById("ot");
 const op=document.getElementById("op");
 const hint=document.getElementById("hint");
+const muteBtn=document.getElementById("muteBtn");
 
 const AudioContextClass=window.AudioContext||window.webkitAudioContext;
 let audioCtx=null;
+let muted=false;
 
 function ensureAudio(){
-  if(!AudioContextClass)return null;
+  if(muted||!AudioContextClass)return null;
   if(!audioCtx)audioCtx=new AudioContextClass();
   if(audioCtx.state==="suspended")audioCtx.resume();
   return audioCtx;
 }
+
+muteBtn.addEventListener("click",(e)=>{
+  e.stopPropagation();
+  muted=!muted;
+  muteBtn.textContent=`SOUND: ${muted?"OFF":"ON"}`;
+  muteBtn.setAttribute("aria-pressed",String(muted));
+});
 
 function playTone({
   frequency=440,
@@ -402,7 +433,7 @@ addEventListener("keyup",keyUp);
 let touchCharging = false;
 
 function beginTouchCharge(e){
-  if(e.target.closest(".back-home"))return;
+  if(e.target.closest(".back-home, .mute"))return;
   e.preventDefault();
 
   if(g.mode==="ready" || g.mode==="gameover"){
@@ -419,7 +450,7 @@ function beginTouchCharge(e){
 }
 
 function releaseTouchJump(e){
-  if(e.target.closest(".back-home"))return;
+  if(e.target.closest(".back-home, .mute"))return;
   e.preventDefault();
 
   if(!touchCharging || !g.charging || !p.ground || g.mode!=="playing"){

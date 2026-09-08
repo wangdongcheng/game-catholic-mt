@@ -82,9 +82,39 @@
       image-rendering: crisp-edges;
     }
 
+    .back-home {
+      position: absolute;
+      z-index: 20;
+      top: 14px;
+      left: 18px;
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 6px 9px;
+      border: 2px solid var(--ink);
+      background: rgba(238, 242, 239, .88);
+      color: var(--ink);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      text-decoration: none;
+      box-shadow: 3px 3px 0 rgba(36, 52, 71, .18);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .back-home:hover {
+      background: var(--foam);
+    }
+
+    .back-home:focus-visible {
+      outline: 3px solid var(--foam);
+      outline-offset: 3px;
+    }
+
     .hud {
       position: absolute;
-      inset: 18px 22px auto 22px;
+      inset: 58px 22px auto 22px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -217,8 +247,17 @@
         box-shadow: none;
       }
 
+      .back-home {
+        top: 6px;
+        left: 7px;
+        min-height: 24px;
+        padding: 3px 6px;
+        border-width: 1px;
+        font-size: 9px;
+      }
+
       .hud {
-        inset: 7px 9px auto 9px
+        inset: 36px 9px auto 9px
       }
 
       .score {
@@ -296,8 +335,17 @@
         box-shadow: none;
       }
 
+      .back-home {
+        top: max(6px, env(safe-area-inset-top));
+        left: max(8px, env(safe-area-inset-left));
+        min-height: 26px;
+        padding: 4px 7px;
+        border-width: 1px;
+        font-size: 10px;
+      }
+
       .hud {
-        inset: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) auto max(12px, env(safe-area-inset-left));
+        inset: max(40px, calc(env(safe-area-inset-top) + 34px)) max(12px, env(safe-area-inset-right)) auto max(12px, env(safe-area-inset-left));
       }
 
       .score {
@@ -353,6 +401,7 @@
   <main class="wrap">
     <section class="game-shell" id="gameShell" aria-label="Still We Sail game">
       <canvas id="game" width="960" height="540"></canvas>
+      <a class="back-home" href="/" aria-label="Back to game home">← GAMES</a>
 
       <div class="hud">
         <div class="score">
@@ -543,7 +592,7 @@
       });
 
       shell.addEventListener("pointerdown", (e) => {
-        if (e.target.closest("button")) return;
+        if (e.target.closest("button, a")) return;
         e.preventDefault();
         startOrJump();
       });

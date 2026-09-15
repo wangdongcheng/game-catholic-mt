@@ -114,7 +114,7 @@
 
     .hud {
       position: absolute;
-      inset: 58px 22px auto 22px;
+      inset: 14px 22px auto 22px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -127,6 +127,7 @@
     .score {
       font-size: clamp(14px, 2vw, 28px);
       line-height: 1.18;
+      margin-top: 44px;
     }
 
     .title {
@@ -257,11 +258,12 @@
       }
 
       .hud {
-        inset: 36px 9px auto 9px
+        inset: 6px 9px auto 9px
       }
 
       .score {
-        font-size: clamp(10px, 3.2vw, 15px)
+        font-size: clamp(10px, 3.2vw, 15px);
+        margin-top: 30px
       }
 
       .title {
@@ -345,11 +347,12 @@
       }
 
       .hud {
-        inset: max(40px, calc(env(safe-area-inset-top) + 34px)) max(12px, env(safe-area-inset-right)) auto max(12px, env(safe-area-inset-left));
+        inset: max(6px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) auto max(12px, env(safe-area-inset-left));
       }
 
       .score {
-        font-size: clamp(12px, 3.4vh, 22px)
+        font-size: clamp(12px, 3.4vh, 22px);
+        margin-top: 34px
       }
 
       .title {

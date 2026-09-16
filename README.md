@@ -1,6 +1,6 @@
 # game-catholic-mt
 
-![alt text](public/og-image.png)
+![alt text](og-image.png)
 
 ## Development
 
@@ -19,5 +19,5 @@ npm run preview
 npm run deploy
 ```
 
-Vite builds the three HTML entry points from `public/` into `dist/`. Wrangler
-deploys the generated `dist/` directory to Cloudflare Workers.
+Vite builds the three HTML entry points from the project root into `dist/`.
+Wrangler deploys the generated `dist/` directory to Cloudflare Workers.

@@ -4,13 +4,12 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 const projectRoot = fileURLToPath(new URL("./", import.meta.url));
-const publicRoot = resolve(projectRoot, "public");
 const distRoot = resolve(projectRoot, "dist");
 
 const pageInputs = {
-  home: resolve(publicRoot, "index.html"),
-  stillWeSail: resolve(publicRoot, "still-we-sail/index.html"),
-  islandLeap: resolve(publicRoot, "island-leap/index.html"),
+  home: resolve(projectRoot, "index.html"),
+  stillWeSail: resolve(projectRoot, "still-we-sail/index.html"),
+  islandLeap: resolve(projectRoot, "island-leap/index.html"),
 };
 
 const socialImages = [
@@ -27,16 +26,15 @@ function preserveSocialImages() {
         socialImages.map(async (relativePath) => {
           const destination = resolve(distRoot, relativePath);
           await mkdir(dirname(destination), { recursive: true });
-          await copyFile(resolve(publicRoot, relativePath), destination);
+          await copyFile(resolve(projectRoot, relativePath), destination);
         }),
       );
     },
   };
 }
 
-// Keep the existing public directory as the source root for this multi-page site.
 export default defineConfig({
-  root: publicRoot,
+  root: projectRoot,
   publicDir: false,
   plugins: [preserveSocialImages()],
   build: {

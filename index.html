@@ -181,6 +181,20 @@
             font-size: 12px;
         }
 
+        .powered-by {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .powered-by img {
+            display: block;
+            width: auto;
+            height: 28px;
+        }
+
         @media (max-width:760px) {
             .page {
                 justify-content: flex-start;
@@ -323,6 +337,10 @@
         <footer>
             <a href="mailto:paul@game.catholic.mt" class="plain-link">paul@game.catholic.mt</a>
             <br>Two journeys · One mission
+            <div class="powered-by">
+                <span>powered by</span>
+                <img src="/logo.png" alt="melomela.cloud" width="2172" height="724">
+            </div>
         </footer>
     </main>
 </body>
